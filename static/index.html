@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RecoverPay</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">R</div>
+          <div>
+            <p class="eyebrow">Recovery Command Center</p>
+            <h1>RecoverPay</h1>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="current-user" class="user-badge">Signed out</span>
+          <button id="logout-btn" class="ghost hidden" type="button">Log out</button>
+          <span class="status-dot online">Live</span>
+        </div>
+      </header>
+
+      <section id="login-panel" class="panel auth-panel">
+        <div class="panel-header">
+          <h3>Secure access</h3>
+          <span class="tag neutral">Protected</span>
+        </div>
+        <div class="auth-form">
+          <div class="field">
+            <label for="login-username">Username</label>
+            <input id="login-username" type="text" value="admin" />
+          </div>
+          <div class="field">
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" value="admin123" />
+          </div>
+          <div class="button-row">
+            <button id="login-btn" class="primary" type="button">Login</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="app-shell" class="hidden">
+      <section class="panel hero">
+        <div class="hero-copy">
+          <p class="hero-kicker"><span class="pulse-dot"></span> AI-grade recovery guidance with guardrails</p>
+          <h2>What should we recover first?</h2>
+          <span class="hero-caption">Prioritize the highest-value opportunities while keeping every action policy-aware.</span>
+        </div>
+        <div class="cta-row">
+          <button id="run-recovery-btn" class="primary" type="button">▶ Run Recovery</button>
+          <div id="recovery-result" class="run-result hidden" role="status"></div>
+        </div>
+      </section>
+
+      <section class="metrics-grid" id="summary-grid"></section>
+
+      <section class="panel form-panel">
+        <div class="field-row">
+          <div class="field">
+            <label for="gateway-code">Gateway code</label>
+            <select id="gateway-code">
+              <option value="NSF">NSF</option>
+              <option value="GATEWAY_ERROR">GATEWAY_ERROR</option>
+              <option value="TIMEOUT">TIMEOUT</option>
+              <option value="BAD_REQUEST_ERROR">BAD_REQUEST_ERROR</option>
+              <option value="RISK_DECLINE">RISK_DECLINE</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="gateway-message">Gateway message</label>
+            <select id="gateway-message">
+              <option value="insufficient_funds">insufficient_funds</option>
+              <option value="timeout">timeout</option>
+              <option value="gateway error">gateway error</option>
+              <option value="network error">network error</option>
+              <option value="invalid_cvv">invalid_cvv</option>
+              <option value="card blocked">card blocked</option>
+              <option value="fraud suspected">fraud suspected</option>
+              <option value="stolen card">stolen card</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="button-row">
+          <button id="classify-btn" class="primary" type="button">Classify</button>
+          <button id="recover-btn" class="secondary" type="button">Recovery plan</button>
+          <button id="reset-btn" class="ghost" type="button">Reset</button>
+        </div>
+      </section>
+
+      <section class="results-grid">
+        <article class="panel result-panel">
+          <div class="panel-header">
+            <h3>Classification</h3>
+            <span id="class-tag" class="tag neutral">Pending</span>
+          </div>
+          <div id="classification-result" class="result-box empty">Enter a gateway error to start.</div>
+        </article>
+
+        <article class="panel result-panel">
+          <div class="panel-header">
+            <h3>Recovery strategy</h3>
+            <span id="decision-tag" class="tag neutral">Pending</span>
+          </div>
+          <div id="decision-result" class="result-box empty">Recovery logic will appear here.</div>
+        </article>
+      </section>
+
+      <section class="two-column-panel">
+        <article class="panel">
+          <div class="panel-header">
+            <h3>AI Recovery Opportunity Ranking</h3>
+            <span class="tag success">Top-5</span>
+          </div>
+          <div id="opportunity-list" class="opportunity-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h3>Why this AI chose it</h3>
+            <span class="tag warning">Explainability</span>
+          </div>
+          <div id="case-detail" class="case-detail empty">Select a case to inspect the reasoning.</div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Autonomous Recovery Loop</h3>
+          <span id="recovery-status" class="tag neutral">Ready</span>
+        </div>
+        <div id="activity-feed" class="activity-feed"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Decision Audit Trail</h3>
+          <span class="tag neutral">Immutable view</span>
+        </div>
+        <div id="audit-feed" class="audit-feed empty">No webhook decisions recorded yet.</div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Recovery Simulation / What-if</h3>
+          <span class="tag success">Estimated</span>
+        </div>
+        <div id="simulation-grid" class="simulation-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Guardrails + Human Approval</h3>
+          <span class="tag neutral">Policy</span>
+        </div>
+        <div class="toggle-list">
+          <label class="toggle"><input type="checkbox" checked /> Auto-retry low-risk failures</label>
+          <label class="toggle"><input type="checkbox" checked /> Auto-send payment links <small>Max ₹25,000</small></label>
+          <label class="toggle"><input type="checkbox" checked /> Customer nudges</label>
+          <label class="toggle"><input type="checkbox" /> Auto-recover high-value payments</label>
+          <label class="toggle"><input type="checkbox" checked /> Require approval above ₹50,000</label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h3>Payment Intelligence</h3>
+          <span class="tag neutral">Data</span>
+        </div>
+        <div class="toolbar">
+          <input id="upload-file" type="file" accept="application/json" />
+          <button id="upload-btn" class="secondary" type="button">Upload batch</button>
+          <button id="export-btn" class="ghost" type="button">Export report</button>
+        </div>
+        <div id="report-summary" class="report-summary"></div>
+        <div id="chart-box" class="chart-box"></div>
+        <div class="table-wrap">
+          <table id="payments-table">
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Failure</th>
+                <th>Recoverability</th>
+                <th>Expected</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

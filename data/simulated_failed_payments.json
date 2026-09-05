@@ -1,0 +1,42 @@
+[
+  {
+    "payment_id": "pay_1001",
+    "amount": 2500,
+    "currency": "INR",
+    "gateway_code": "NSF",
+    "gateway_message": "insufficient_funds",
+    "merchant_id": "m_001"
+  },
+  {
+    "payment_id": "pay_1002",
+    "amount": 1800,
+    "currency": "INR",
+    "gateway_code": "GATEWAY_ERROR",
+    "gateway_message": "bank timeout",
+    "merchant_id": "m_001"
+  },
+  {
+    "payment_id": "pay_1003",
+    "amount": 4200,
+    "currency": "INR",
+    "gateway_code": "BAD_REQUEST_ERROR",
+    "gateway_message": "invalid_cvv",
+    "merchant_id": "m_002"
+  },
+  {
+    "payment_id": "pay_1004",
+    "amount": 3100,
+    "currency": "INR",
+    "gateway_code": "RISK_DECLINE",
+    "gateway_message": "card blocked",
+    "merchant_id": "m_003"
+  },
+  {
+    "payment_id": "pay_1005",
+    "amount": 5600,
+    "currency": "INR",
+    "gateway_code": "UNKNOWN",
+    "gateway_message": "customer reported bank auth issue after two failed attempts",
+    "merchant_id": "m_004"
+  }
+]
