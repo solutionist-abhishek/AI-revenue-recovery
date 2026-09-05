@@ -238,7 +238,7 @@ def recover_endpoint(payload: PaymentRequest) -> dict:
 def verify_webhook_signature(raw_body: bytes, signature: str) -> bool:
     secret = os.getenv("RAZORPAY_WEBHOOK_SECRET")
     if not secret:
-        return True
+        return os.getenv("RECOVERPAY_ENV", "development").lower() != "production"
     expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
     return bool(signature) and hmac.compare_digest(expected, signature)
 

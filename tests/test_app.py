@@ -90,6 +90,17 @@ def test_razorpay_webhook_rejects_invalid_signature(monkeypatch, tmp_path):
     assert response.status_code == 401
 
 
+def test_razorpay_webhook_requires_secret_in_production(monkeypatch, tmp_path):
+    monkeypatch.setenv("RECOVERPAY_ENV", "production")
+    monkeypatch.delenv("RAZORPAY_WEBHOOK_SECRET", raising=False)
+    monkeypatch.setenv("RECOVERPAY_DB_PATH", str(tmp_path / "recoverpay.db"))
+    response = client.post(
+        "/webhooks/razorpay",
+        content=b'{"event":"payment.failed"}',
+    )
+    assert response.status_code == 401
+
+
 def test_dashboard_returns_ranked_opportunities():
     login_response = client.post(
         "/login",

@@ -65,6 +65,8 @@ Send a Razorpay-style `payment.failed` payload to `POST /webhooks/razorpay` with
 
 For local demo mode, omitting `RAZORPAY_WEBHOOK_SECRET` accepts requests without signature verification. Always configure it in a deployed environment.
 
+Copy `.env.example` to `.env` or set the variables in your deployment environment. When `RECOVERPAY_ENV=production`, the webhook rejects every request unless `RAZORPAY_WEBHOOK_SECRET` is configured.
+
 ## Project structure
 
 ```text
@@ -91,6 +93,7 @@ recoverpay/
 ├── tests/
 │   └── test_recovery_pipeline.py
 ├── requirements.txt
+├── .env.example
 └── .gitignore
 ```
 
