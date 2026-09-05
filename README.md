@@ -14,6 +14,7 @@ A deterministic recovery engine for failed payments, abandoned checkouts, and un
 - Every action is logged with a rule ID and reason for full auditability.
 - Razorpay-style `payment.failed` webhooks are signature-verified and persisted idempotently.
 - Operators can inspect the resulting audit trail from the protected `/audit` endpoint.
+- The command center is data-driven: ranking, recoverability, expected recovery, and what-if totals are computed from the payment batch through the classifier, diagnostic, and policy layers.
 
 ## Why this matters
 

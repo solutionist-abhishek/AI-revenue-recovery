@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import os
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -12,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.classifier import classify_payment
+from src.ai_diagnostic.diagnostic import diagnose_failure
 from src.persistence import list_audit_events, save_webhook_event
 from src.policy_engine import decide_recovery
 
@@ -44,154 +46,104 @@ def get_current_user(request: Request) -> dict[str, str]:
     return {"username": session_token, "role": user["role"], "name": user["name"]}
 
 
-def build_payment_records() -> list[dict[str, Any]]:
-    return [
-        {
-            "customer": "Rahul",
-            "amount": 48000,
-            "failure": "Bank timeout",
-            "recoverability": 0.94,
-            "expected_recovery": 45120,
-            "status": "retry",
-            "risk": "LOW",
-        },
-        {
-            "customer": "Neha",
-            "amount": 75000,
-            "failure": "Network error",
-            "recoverability": 0.90,
-            "expected_recovery": 67500,
-            "status": "retry",
-            "risk": "LOW",
-        },
-        {
-            "customer": "Arjun",
-            "amount": 8500,
-            "failure": "UPI timeout",
-            "recoverability": 0.88,
-            "expected_recovery": 7480,
-            "status": "retry",
-            "risk": "LOW",
-        },
-        {
-            "customer": "Priya",
-            "amount": 12500,
-            "failure": "Low balance",
-            "recoverability": 0.62,
-            "expected_recovery": 7750,
-            "status": "nudge",
-            "risk": "MEDIUM",
-        },
-        {
-            "customer": "Sanjay",
-            "amount": 75000,
-            "failure": "Card decline",
-            "recoverability": 0.53,
-            "expected_recovery": 39750,
-            "status": "approval",
-            "risk": "HIGH",
-        },
-    ]
+SIMULATED_PAYMENTS_PATH = Path(__file__).resolve().parent / "data" / "simulated_failed_payments.json"
+
+
+def load_simulated_payments() -> list[dict[str, Any]]:
+    return json.loads(SIMULATED_PAYMENTS_PATH.read_text(encoding="utf-8"))
 
 
 def build_opportunities() -> list[dict[str, Any]]:
-    opportunities = [
-        {
-            "customer": "Rahul",
-            "amount": 48000,
-            "failure": "Bank timeout",
-            "recoverability": 0.94,
-            "expected_recovery": 45120,
-            "risk": "LOW",
-            "confidence": 0.91,
-            "recommended_action": "Retry payment later",
-            "approval_required": False,
-            "reasons": [
-                "Bank timeout is usually transient",
-                "Customer has 17/18 successful payments",
-                "Customer lifetime value: ₹1.25L",
-                "No suspicious payment behavior",
-                "Similar failures recovered successfully",
-            ],
-            "guardrail": "PASSED",
-        },
-        {
-            "customer": "Neha",
-            "amount": 75000,
-            "failure": "Network error",
-            "recoverability": 0.90,
-            "expected_recovery": 67500,
-            "risk": "LOW",
-            "confidence": 0.88,
-            "recommended_action": "Retry with backoff",
-            "approval_required": False,
-            "reasons": [
-                "Failure pattern matches infrastructure instability",
-                "Recent payment history is healthy",
-                "Customer has low dispute rate",
-                "Retry timing is low-risk",
-            ],
-            "guardrail": "PASSED",
-        },
-        {
-            "customer": "Arjun",
-            "amount": 8500,
-            "failure": "UPI timeout",
-            "recoverability": 0.88,
-            "expected_recovery": 7480,
-            "risk": "LOW",
-            "confidence": 0.86,
-            "recommended_action": "Send payment link",
-            "approval_required": False,
-            "reasons": [
-                "Transient gateway issue",
-                "Low-value payment minimizes risk",
-                "Alternate method is inexpensive to test",
-                "Customer engagement is high",
-            ],
-            "guardrail": "PASSED",
-        },
-        {
-            "customer": "Priya",
-            "amount": 12500,
-            "failure": "Low balance",
-            "recoverability": 0.62,
-            "expected_recovery": 7750,
-            "risk": "MEDIUM",
-            "confidence": 0.72,
-            "recommended_action": "Send gentle nudge",
-            "approval_required": False,
-            "reasons": [
-                "Issue appears customer-side",
-                "A reminder may improve completion",
-                "Payment is mid-sized and low-risk",
-                "Nudge is cheaper than a retry loop",
-            ],
-            "guardrail": "PASSED",
-        },
-        {
-            "customer": "Sanjay",
-            "amount": 75000,
-            "failure": "Card decline",
-            "recoverability": 0.53,
-            "expected_recovery": 39750,
-            "risk": "HIGH",
-            "confidence": 0.67,
-            "recommended_action": "Request approval before retry",
-            "approval_required": True,
-            "reasons": [
-                "High-value payment above approval threshold",
-                "Failure may be customer or issuer issue",
-                "Action must be controlled and auditable",
-                "Merchant policy requires manual review",
-            ],
-            "guardrail": "HUMAN_APPROVAL_REQUIRED",
-        },
-    ]
+    opportunities = []
+    recovery_rates = {
+        "nsf": 0.62,
+        "insufficient_funds": 0.62,
+        "bank_timeout": 0.88,
+        "gateway_timeout": 0.88,
+        "network_error": 0.84,
+        "invalid_cvv": 0.0,
+        "card_blocked": 0.0,
+        "needs_human_review": 0.25,
+    }
 
-    for item in opportunities:
-        item["action_label"] = item["recommended_action"].upper().replace(" ", "_")
+    for payment in load_simulated_payments():
+        classification = classify_payment(payment["gateway_code"], payment["gateway_message"])
+        diagnosis = None
+        if classification["category"] == "ambiguous":
+            diagnosis = diagnose_failure(payment["gateway_code"], payment["gateway_message"])
+            classification = {
+                **classification,
+                "normalized_reason": diagnosis["likely_cause"],
+                "confidence": diagnosis["confidence"],
+                "diagnostic_source": "ai_diagnostic",
+            }
+
+        decision = decide_recovery(classification)
+        reason = classification["normalized_reason"]
+        recoverability = recovery_rates.get(reason, 0.25 if decision["should_retry"] else 0.0)
+        approval_required = payment["amount"] >= 50000 or reason == "needs_human_review"
+        if approval_required:
+            recoverability = min(recoverability, 0.25)
+
+        if approval_required:
+            action = "Request approval before recovery"
+            status = "approval"
+        elif decision["should_retry"]:
+            action = "Retry with policy backoff"
+            status = "retry"
+        else:
+            action = "Stop and review"
+            status = "review"
+
+        reasons = [
+            f"Gateway {payment['gateway_code']} normalized to {reason}",
+            f"Policy decision: {'retry permitted' if decision['should_retry'] else decision['stop_reason']}",
+            f"Confidence: {classification['confidence']:.0%}",
+        ]
+        if diagnosis:
+            reasons.append(f"AI diagnosis: {diagnosis['likely_cause']} ({diagnosis['recommended_action']})")
+        if approval_required:
+            reasons.append("Human approval is required above the ₹50,000 guardrail")
+
+        opportunities.append({
+            "customer": payment["payment_id"],
+            "payment_id": payment["payment_id"],
+            "merchant_id": payment["merchant_id"],
+            "amount": payment["amount"],
+            "failure": payment["gateway_message"],
+            "gateway_code": payment["gateway_code"],
+            "normalized_reason": reason,
+            "category": classification["category"],
+            "recoverability": recoverability,
+            "expected_recovery": round(payment["amount"] * recoverability),
+            "status": status,
+            "risk": "HIGH" if approval_required else "LOW" if recoverability >= 0.7 else "MEDIUM",
+            "confidence": classification["confidence"],
+            "recommended_action": action,
+            "approval_required": approval_required,
+            "reasons": reasons,
+            "guardrail": "HUMAN_APPROVAL_REQUIRED" if approval_required else "PASSED",
+            "action_label": action.upper().replace(" ", "_"),
+            "classification": classification,
+            "decision": decision,
+        })
+
     return sorted(opportunities, key=lambda item: item["expected_recovery"], reverse=True)
+
+
+def build_payment_records() -> list[dict[str, Any]]:
+    return [
+        {
+            "customer": item["customer"],
+            "amount": item["amount"],
+            "failure": item["failure"],
+            "recoverability": item["recoverability"],
+            "expected_recovery": item["expected_recovery"],
+            "status": item["status"],
+            "risk": item["risk"],
+        }
+        for item in build_opportunities()
+    ]
 
 
 def build_dashboard() -> dict[str, Any]:
@@ -208,24 +160,33 @@ def build_dashboard() -> dict[str, Any]:
         },
         "opportunities": opportunities,
         "insights": {
-            "headline": "12 HIGH-VALUE OPPORTUNITIES",
-            "recommended_now": "Retry Rahul, Neha, and Arjun first",
+            "headline": f"{len(opportunities)} PIPELINE OPPORTUNITIES",
+            "recommended_now": f"Prioritize {opportunities[0]['customer']} ({opportunities[0]['normalized_reason']}) first",
         },
     }
 
 
 def build_simulation() -> dict[str, Any]:
+    opportunities = build_opportunities()
+    total_at_risk = sum(item["amount"] for item in opportunities)
+    expected_recovery = sum(item["expected_recovery"] for item in opportunities)
+    retryable_recovery = sum(
+        item["expected_recovery"] for item in opportunities if item["decision"]["should_retry"]
+    )
+    targeted_recovery = sum(
+        item["expected_recovery"] for item in opportunities if item["status"] != "review"
+    )
     current_state = {
-        "failed_payments": 47,
-        "revenue_at_risk": 840000,
-        "current_recovery": 170000,
-        "recovery_rate": 20,
+        "failed_payments": len(opportunities),
+        "revenue_at_risk": total_at_risk,
+        "current_recovery": 0,
+        "recovery_rate": 0,
     }
     strategies = [
-        {"name": "No automation", "expected_recovery": 170000, "delta": 0},
-        {"name": "Retry everything", "expected_recovery": 240000, "delta": 70000},
-        {"name": "AI recovery", "expected_recovery": 390000, "delta": 220000},
-        {"name": "AI + targeted nudges", "expected_recovery": 430000, "delta": 260000},
+        {"name": "No automation", "expected_recovery": 0, "delta": 0},
+        {"name": "Retry everything", "expected_recovery": retryable_recovery, "delta": retryable_recovery},
+        {"name": "AI recovery", "expected_recovery": expected_recovery, "delta": expected_recovery},
+        {"name": "AI + guardrails", "expected_recovery": targeted_recovery, "delta": targeted_recovery},
     ]
     return {
         "current_state": current_state,

@@ -11,6 +11,8 @@ The architecture is intentionally split into deterministic and diagnostic layers
 5. Policy engine validates the diagnosis against compliance rules before issuing a retry, message, or escalation.
 6. Every action is logged to an audit trail.
 
+The dashboard uses the same path for its simulated batch. It loads each payment from `data/simulated_failed_payments.json`, classifies it, sends ambiguous failures through the diagnostic layer, applies the policy engine, and derives the ranking, expected recovery, report, and simulation totals from those decisions.
+
 ## Razorpay integration boundary
 
 `POST /webhooks/razorpay` accepts a Razorpay-style `payment.failed` event. When `RAZORPAY_WEBHOOK_SECRET` is configured, the raw request body is verified with HMAC-SHA256 against the `x-razorpay-signature` header before parsing. The payment ID is the idempotency key, so a retried webhook is recorded as a duplicate rather than producing a second recovery decision.

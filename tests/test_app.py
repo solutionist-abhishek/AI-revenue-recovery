@@ -105,6 +105,29 @@ def test_dashboard_returns_ranked_opportunities():
     assert payload["opportunities"][0]["expected_recovery"] >= payload["opportunities"][1]["expected_recovery"]
 
 
+def test_dashboard_is_computed_from_simulated_payment_pipeline():
+    response = client.get("/dashboard", cookies={"session_token": "admin"})
+    assert response.status_code == 200
+    payload = response.json()
+    opportunities = payload["opportunities"]
+
+    assert {item["payment_id"] for item in opportunities} == {
+        "pay_1001", "pay_1002", "pay_1003", "pay_1004", "pay_1005"
+    }
+    ambiguous = next(item for item in opportunities if item["payment_id"] == "pay_1005")
+    assert ambiguous["classification"]["diagnostic_source"] == "ai_diagnostic"
+    assert ambiguous["normalized_reason"] == "needs_human_review"
+    assert ambiguous["approval_required"] is True
+
+
+def test_simulation_totals_match_dashboard_opportunities():
+    dashboard = client.get("/dashboard", cookies={"session_token": "admin"}).json()
+    simulation = client.get("/simulate", cookies={"session_token": "admin"}).json()
+    expected = dashboard["summary"]["expected_recovery"]
+    ai_strategy = next(item for item in simulation["strategies"] if item["name"] == "AI recovery")
+    assert ai_strategy["expected_recovery"] == expected
+
+
 def test_simulation_returns_strategy_comparison():
     response = client.get("/simulate", cookies={"session_token": "admin"})
     assert response.status_code == 200
